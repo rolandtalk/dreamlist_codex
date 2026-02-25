@@ -1,2 +1,2 @@
-web: python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+web: python run_web.py
 worker: celery -A app.celery_app:celery_app worker --loglevel=INFO
