@@ -64,7 +64,7 @@
         <div class="toolbar">
           <input id="q" placeholder="Filter by symbol" />
           <button id="reloadBtn">Update List</button>
-          <button id="exportBtn">Export to Google Sheets</button>
+          <button id="exportBtn">Export CSV</button>
           <button id="prevBtn">Prev</button>
           <button id="nextBtn">Next</button>
           <span id="status" class="meta"></span>
@@ -170,7 +170,7 @@
       }
 
       document.getElementById('reloadBtn').onclick = () => post('/api/jobs/run', 'Update done');
-      document.getElementById('exportBtn').onclick = () => post('/api/jobs/export-latest', 'Export done');
+      document.getElementById('exportBtn').onclick = () => { window.location.href = '/api/export/latest.csv'; };
       document.getElementById('q').onchange = () => { page = 1; load(); };
       document.getElementById('prevBtn').onclick = () => { if (page > 1) { page--; load(); } };
       document.getElementById('nextBtn').onclick = () => { page++; load(); };

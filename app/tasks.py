@@ -7,17 +7,9 @@ from celery import states
 
 from app.celery_app import celery_app
 from app.config import settings
-from app.db import (
-    create_run,
-    fetch_picks,
-    finish_run,
-    has_running_run,
-    latest_run,
-    save_picks,
-)
+from app.db import create_run, finish_run, has_running_run, save_picks
 from app.services.notify import notify_job_failed, notify_job_succeeded
 from app.services.sctr import scrape_sctr_list
-from app.services.sheets import export_rows
 from app.services.yf_metrics import compute_metrics
 
 
@@ -51,9 +43,6 @@ def run_sctr_pipeline_task(self, source: str = "manual") -> dict:
         save_picks(run_id, enriched)
         finish_run(run_id, "ok", len(enriched))
 
-        if settings.auto_export_on_success:
-            export_latest_to_sheet_task.delay()
-
         notify_job_succeeded(source=source, run_key=key, total=len(enriched))
         return {"status": "ok", "run_id": run_id, "count": len(enriched)}
     except Exception as exc:
@@ -61,27 +50,3 @@ def run_sctr_pipeline_task(self, source: str = "manual") -> dict:
         notify_job_failed(source=source, run_key=key, err=str(exc))
         self.update_state(state=states.FAILURE, meta={"error": str(exc)})
         raise
-
-
-@celery_app.task(
-    bind=True,
-    name="app.tasks.export_latest_to_sheet",
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_jitter=True,
-    retry_kwargs={"max_retries": settings.task_max_retries},
-)
-def export_latest_to_sheet_task(self) -> dict:
-    last = latest_run()
-    if not last:
-        return {"status": "failed", "error": "No successful run found."}
-
-    _, rows = fetch_picks(int(last["id"]), q="", offset=0, limit=5000)
-    payload = [dict(r) for r in rows]
-    export_rows(
-        credentials_json_path=str(settings.google_credentials_json),
-        spreadsheet_id=settings.google_sheet_id,
-        worksheet_title=settings.google_worksheet_title,
-        rows=payload,
-    )
-    return {"status": "ok", "exported": len(payload), "run_id": int(last["id"])}

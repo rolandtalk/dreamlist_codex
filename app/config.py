@@ -20,13 +20,6 @@ class Settings(BaseModel):
 
     sqlite_path: Path = Path(os.getenv("SQLITE_PATH", "./data/dreamlist.db"))
 
-    google_credentials_json: Path = Path(
-        os.getenv("GOOGLE_CREDENTIALS_JSON", "./service-account.json")
-    )
-    google_sheet_id: str = os.getenv("GOOGLE_SHEET_ID", "")
-    google_worksheet_title: str = os.getenv("GOOGLE_WORKSHEET_TITLE", "SCTR_TOP_300")
-    auto_export_on_success: bool = os.getenv("AUTO_EXPORT_ON_SUCCESS", "false").lower() == "true"
-
     redis_url: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
     celery_broker_url: str = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", "redis://redis:6379/0"))
     celery_result_backend: str = os.getenv(

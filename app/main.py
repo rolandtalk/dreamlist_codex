@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import csv
+import io
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from celery.result import AsyncResult
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.celery_app import celery_app
 from app.db import fetch_picks, init_db, latest_run, latest_runs
 from app.jobs import shutdown_scheduler, start_scheduler
-from app.tasks import export_latest_to_sheet_task, run_sctr_pipeline_task
+from app.tasks import run_sctr_pipeline_task
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -69,10 +71,35 @@ def api_run_job():
     return {"status": "queued", "task_id": task.id}
 
 
-@app.post("/api/jobs/export-latest")
-def api_export_latest():
-    task = export_latest_to_sheet_task.delay()
-    return {"status": "queued", "task_id": task.id}
+@app.get("/api/export/latest.csv")
+def api_export_latest_csv():
+    run = latest_run()
+    if not run:
+        raise HTTPException(status_code=404, detail="No successful run found.")
+
+    _, rows = fetch_picks(int(run["id"]), q="", offset=0, limit=5000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["rank", "symbol", "sctr", "perf_1d", "perf_5d", "perf_20d", "perf_60d", "rsi_14"])
+    for r in rows:
+        writer.writerow([
+            r["rank"],
+            r["symbol"],
+            r["sctr"],
+            r["perf_1d"],
+            r["perf_5d"],
+            r["perf_20d"],
+            r["perf_60d"],
+            r["rsi_14"],
+        ])
+
+    data = output.getvalue()
+    filename = f"sctr_top_{len(rows)}.csv"
+    return StreamingResponse(
+        iter([data]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @app.get("/api/jobs/status/{task_id}")
